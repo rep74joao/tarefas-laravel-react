@@ -1,5 +1,7 @@
-import React, {createContext, useContext, useState, useEffect} from "react";
+import React, {createContext,useReducer, useContext, useState, useEffect, ReactNode} from "react";
 import Api from "../Api";
+import {userReducer} from "../reducers/reducer";
+import {ActionsTypes} from "../reducers/actions";
 
 type User = {
     id: number,
@@ -17,29 +19,38 @@ type Task = {
 type UserContextData = {
     user: User,
     token: string,
-    getDataStorage: () => Promise<void>
-    getTasks: () => Promise<void>
-    logout: () => Promise<void>
+    getDataStorage: () => Promise<void>,
+    getTasks: () => Promise<void>,
+    logout: () => Promise<void>,
+    tasks: []
 }
 
 export const UserContext = createContext({} as UserContextData);
 
-function UserProvider({children} : UserContextData){
-    const [user, setUser] = useState<User | null>(null);
-    const [token, setToken] = useState('');
-    const [tasks, setTasks] = useState<Task[]>([]);
+function UserProvider({children} : ReactNode){
+
+    const [state, dispatch] = useReducer(userReducer, {
+        user: [],
+        tasks:[],
+        token:''
+    });
+
+    const {user, token, tasks} = state;
 
     async function getDataStorage(){
-        const userData = await sessionStorage.getItem('user');
-        const token = await sessionStorage.getItem('token');
+        const userData = sessionStorage.getItem('user');
+        const token = sessionStorage.getItem('token');
 
         if (userData && token){
             const u = JSON.parse(userData) as User;
-            const t = token;
-            setToken(t);
-            setUser(u)
-            const tt = await Api.GetTasks(u.id, t)
-            setTasks(tt);
+            const tt = await Api.GetTasks(u.id, token);
+
+            dispatch({
+                type:ActionsTypes.GET_DATA_STORAGE,
+                user: u,
+                token: token,
+                tasks: tt,
+            })
         }
     }
 
@@ -50,10 +61,10 @@ function UserProvider({children} : UserContextData){
 
 
     async function getTasks(){
-        if (user){
-            const t = await Api.GetTasks(user.id, token)
-            setTasks(t);
-        }
+        dispatch({
+            type: ActionsTypes.GET_TASKS,
+            tasks: await Api.GetTasks(user.id, token)
+        })
     }
 
 
